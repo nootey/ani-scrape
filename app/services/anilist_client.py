@@ -1,3 +1,4 @@
+import asyncio
 from logging import Logger
 from typing import List, Dict, Any, Optional
 
@@ -13,10 +14,15 @@ class AniListClient:
     async def _query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                self.api_url,
-                json={"query": query, "variables": variables or {}},
-                timeout=aiohttp.ClientTimeout(total=30)
+                    self.api_url,
+                    json={"query": query, "variables": variables or {}},
+                    timeout=aiohttp.ClientTimeout(total=30)
             ) as response:
+                if response.status == 429:
+                    self.logger.warning("Rate limited by AniList, waiting 10 seconds...")
+                    await asyncio.sleep(10)
+                    return await self._query(query, variables)
+
                 if response.status != 200:
                     self.logger.error(f"AniList API error: {response.status}")
                     return {}
@@ -26,6 +32,8 @@ class AniListClient:
                 if "errors" in data:
                     self.logger.error(f"GraphQL errors: {data['errors']}")
                     return {}
+
+                await asyncio.sleep(0.5)
 
                 return data.get("data", {})
 

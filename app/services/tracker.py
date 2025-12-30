@@ -55,17 +55,13 @@ class ReleaseTracker:
                     latest_in_db = await self.db.get_latest_release_number(media_id)
 
                     if latest_in_db is None:
-                        self.logger.info(
-                            f"First check for {title_romaji}, recording up to "
-                            f"{'episode' if media_type == MediaType.ANIME else 'chapter'} {total_count}"
-                        )
+                        type_label = "episode" if media_type == MediaType.ANIME else "chapter"
+                        self.logger.info(f"First check for {title_romaji}, recording up to {type_label} {total_count}")
                         await self.db.add_release(media_id, float(total_count))
                         continue
 
                     if total_count > latest_in_db:
-                        self.logger.info(
-                            f"New releases found for {title_romaji}: {latest_in_db} -> {total_count}"
-                        )
+                        self.logger.info(f"New releases found for {title_romaji}: {latest_in_db} -> {total_count}")
 
                         for number in range(int(latest_in_db) + 1, int(total_count) + 1):
                             release, is_new = await self.db.add_release(media_id, float(number))
