@@ -112,9 +112,10 @@ class DatabaseClient:
         media = result.scalar_one_or_none()
 
         if media:
+            title = media.title_romaji
             await session.delete(media)
             await session.commit()
-            self.logger.info(f"Deleted media: {media.title_romaji}")
+            self.logger.info(f"Deleted media: {title}")
             return True
         return False
 
