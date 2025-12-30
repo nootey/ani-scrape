@@ -24,60 +24,66 @@ class ReleaseTracker:
                 self.logger.info("No media being tracked")
                 return
 
-            self.logger.info(f"Checking {len(media_list)} media for updates")
+            media_data = []
+            for media in media_list:
+                media_data.append({
+                    "media_id": media.id,
+                    "anilist_id": media.anilist_id,
+                    "title_romaji": media.title_romaji,
+                    "title_english": media.title_english,
+                    "media_type": media.media_type,
+                    "media_type_str": "ANIME" if media.media_type == MediaType.ANIME else "MANGA"
+                })
+
+            self.logger.info(f"Checking {len(media_data)} media for updates")
 
             new_releases = []
 
-            for media in media_list:
-                media_id = media.id
-                anilist_id = media.anilist_id
-                title_romaji = media.title_romaji
-                title_english = media.title_english
-                media_type = media.media_type
-                media_type_str = "ANIME" if media_type == MediaType.ANIME else "MANGA"
-
+            for data in media_data:
                 try:
-                    media_info = await self.client.get_media_by_id(anilist_id, media_type_str)
+                    media_info = await self.client.get_media_by_id(data["anilist_id"], data["media_type_str"])
 
                     if not media_info:
-                        self.logger.warning(f"Could not fetch info for {title_romaji}")
+                        self.logger.warning(f"Could not fetch info for {data['title_romaji']}")
                         continue
 
-                    if media_type == MediaType.ANIME:
+                    if data["media_type"] == MediaType.ANIME:
                         total_count = media_info.get("episodes")
                     else:
                         total_count = media_info.get("chapters")
 
                     if not total_count:
-                        self.logger.debug(f"No episode/chapter count for {title_romaji}")
+                        self.logger.debug(f"No episode/chapter count for {data['title_romaji']}")
                         continue
 
-                    latest_in_db = await self.db.get_latest_release_number(media_id)
+                    latest_in_db = await self.db.get_latest_release_number(data["media_id"])
 
                     if latest_in_db is None:
-                        type_label = "episode" if media_type == MediaType.ANIME else "chapter"
-                        self.logger.info(f"First check for {title_romaji}, recording up to {type_label} {total_count}")
-                        await self.db.add_release(media_id, float(total_count))
+                        type_label = "episode" if data["media_type"] == MediaType.ANIME else "chapter"
+                        self.logger.info(
+                            f"First check for {data['title_romaji']}, recording up to {type_label} {total_count}")
+                        await self.db.add_release(data["media_id"], float(total_count))
                         continue
 
                     if total_count > latest_in_db:
-                        self.logger.info(f"New releases found for {title_romaji}: {latest_in_db} -> {total_count}")
+                        self.logger.info(
+                            f"New releases found for {data['title_romaji']}: {latest_in_db} -> {total_count}")
 
                         for number in range(int(latest_in_db) + 1, int(total_count) + 1):
-                            release, is_new = await self.db.add_release(media_id, float(number))
+                            release, is_new = await self.db.add_release(data["media_id"], float(number))
 
                             if is_new:
                                 new_releases.append({
                                     "release_id": release.id,
                                     "number": float(number),
-                                    "anilist_id": anilist_id,
-                                    "title_romaji": title_romaji,
-                                    "title_english": title_english,
-                                    "media_type": media_type
+                                    "anilist_id": data["anilist_id"],
+                                    "title_romaji": data["title_romaji"],
+                                    "title_english": data["title_english"],
+                                    "media_type": data["media_type"]
                                 })
 
                 except Exception as e:
-                    self.logger.error(f"Error checking {title_romaji}: {e}")
+                    self.logger.error(f"Error checking {data['title_romaji']}: {e}")
                     continue
 
             if new_releases:
