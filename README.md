@@ -47,12 +47,6 @@ If you want to run ani-scrape locally for development:
 uv sync
 ```
 
-Install Playwright browsers
-
-```bash
-uv run playwright install chromium
-```
-
 Run the app
 ```bash
 python -m main
