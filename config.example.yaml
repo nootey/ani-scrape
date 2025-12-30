@@ -1,0 +1,19 @@
+# App configuration
+app:
+  anilist_api_url: "https://graphql.anilist.co"
+
+# Database configuration
+database:
+  path: ./storage/db/aniscrape.sqlite
+  auto_flush: true
+
+# Discord configuration
+discord:
+  webhook_url: "https://discord.com/api/webhooks/..."
+  notify_on_error: true
+
+# Scheduler configuration
+scheduler:
+  enabled: true
+  interval_hours: 1
+  timezone: Europe/Ljubljana
