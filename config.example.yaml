@@ -15,6 +15,5 @@ discord:
 
 # Scheduler configuration
 scheduler:
-  enabled: true
   interval_hours: 1
   timezone: Europe/Ljubljana

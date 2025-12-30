@@ -170,12 +170,8 @@ class AniScrapeApp:
         self.logger.info("Running initial release check...")
         await self.tracker.check_for_updates()
 
-        if config.scheduler.enabled:
-            self.logger.info("Starting scheduler...")
-            await start_scheduler(self.logger)
-        else:
-            self.logger.info("Scheduler disabled, exiting after initial check")
-            await self.db.cleanup()
+        self.logger.info("Starting scheduler...")
+        await start_scheduler(self.logger)
 
     async def test_notification(self):
         """Test notifications by rolling back last release"""

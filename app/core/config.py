@@ -18,7 +18,6 @@ class DiscordConfig(BaseModel):
     notify_on_error: bool = False
 
 class SchedulerConfig(BaseModel):
-    enabled: bool = True
     interval_hours: int = 1
     timezone: str = "Europe/Ljubljana"
 
