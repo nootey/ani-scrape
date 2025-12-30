@@ -4,6 +4,7 @@ A lightweight anime and manga release tracker that monitors AniList and sends Di
 
 ## Features
 
+- AniList Sync - Automatically sync your WATCHING/READING lists from AniList
 - Search & subscribe - Search AniList's database and subscribe to any anime or manga
 - Automatic notifications - Get Discord notifications when new episodes/chapters are released
 - Lightweight local storage for your subscriptions
@@ -32,6 +33,11 @@ Run the scrapper with this command:
 
 ```bash
 docker compose -f ./deployment/docker-compose.yml -p aniscrape up
+```
+
+**Manual Mode**
+```bash
+docker exec -it aniscrape python main.py --manual
 ```
 
 ## Local
