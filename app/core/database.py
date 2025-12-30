@@ -162,7 +162,7 @@ class DatabaseClient:
         stmt = (
             select(Release)
             .options(joinedload(Release.media))
-            .where(Release.notified == False)
+            .where(Release.notified.is_(False))
             .order_by(Release.created_at.desc())
         )
         result = await session.execute(stmt)

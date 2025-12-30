@@ -1,5 +1,4 @@
 from logging import Logger
-from typing import List
 
 from app.core.config import config
 from app.core.database import DatabaseClient

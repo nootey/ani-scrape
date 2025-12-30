@@ -1,5 +1,4 @@
 from logging import Logger
-from typing import List, Dict, Any
 
 from app.core.database import DatabaseClient
 from app.core.models import MediaType
