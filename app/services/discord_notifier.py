@@ -71,7 +71,6 @@ class DiscordNotifier:
             self.logger.exception(f"Exception occurred while sending batch to Discord: {e}")
 
     def send_error(self, error_message: str, details: str = None):
-        """Send error notification to Discord"""
         if not self.webhook_url:
             return
 

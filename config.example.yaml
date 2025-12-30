@@ -1,6 +1,7 @@
 # App configuration
-app:
-  anilist_api_url: "https://graphql.anilist.co"
+anilist:
+  api_url: "https://graphql.anilist.co"
+  username: ""
 
 # Database configuration
 database:

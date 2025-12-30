@@ -4,8 +4,9 @@ import yaml
 from pydantic import BaseModel, Field, field_validator
 
 
-class AppConfig(BaseModel):
-    anilist_api_url: str
+class AnilistConfig(BaseModel):
+    api_url: str = "https://graphql.anilist.co"
+    username: str
 
 
 class DatabaseConfig(BaseModel):
@@ -34,7 +35,7 @@ class SchedulerConfig(BaseModel):
 
 
 class Config(BaseModel):
-    app: AppConfig
+    anilist: AnilistConfig
     database: DatabaseConfig
     discord: DiscordConfig
     scheduler: SchedulerConfig

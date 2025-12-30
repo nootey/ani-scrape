@@ -8,6 +8,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.config import config
 from app.core.database import DatabaseClient
+from app.services.sync import AniListSync
 from app.services.tracker import ReleaseTracker
 
 
@@ -21,6 +22,11 @@ async def run_tracker_job(logger: Logger):
         db_url = f"sqlite+aiosqlite:///{config.database.path}"
         db_client = DatabaseClient(url=db_url, logger=logger)
 
+        # Sync from AniList first
+        sync = AniListSync(logger, db_client)
+        await sync.sync_from_anilist()
+
+        # Then check for updates
         tracker = ReleaseTracker(logger, db_client)
         await tracker.check_for_updates()
 

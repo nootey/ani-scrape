@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import os
-import sys
 from logging import Logger
 from pathlib import Path
 
@@ -11,6 +10,7 @@ from app.core.database import DatabaseClient
 from app.core.models import MediaType
 from app.services.anilist_client import AniListClient
 from app.services.scheduler import start_scheduler
+from app.services.sync import AniListSync
 from app.services.tracker import ReleaseTracker
 
 
@@ -20,6 +20,7 @@ class AniScrapeApp:
         self.db = DatabaseClient(db_url, logger)
         self.client = AniListClient(logger)
         self.tracker = ReleaseTracker(logger, self.db)
+        self.sync = AniListSync(logger, self.db)
 
     async def search_media(self):
         print("\n Anime/Manga search")
@@ -152,21 +153,23 @@ class AniScrapeApp:
             else:
                 print("\n❌ Invalid choice!")
 
-    async def run_cli(self):
+    async def run_manual(self):
         self.logger.info("Starting in CLI mode")
         await self.db.create_models()
         await self.show_menu()
         await self.db.cleanup()
 
-    async def run_daemon(self):
-        """Run in daemon mode with scheduler"""
-        self.logger.info("Starting in daemon mode")
+    async def run_automatic(self):
+        self.logger.info("Starting in automatic mode")
+
         await self.db.create_models()
+
+        self.logger.info("Syncing subscriptions from AniList...")
+        await self.sync.sync_from_anilist()
 
         self.logger.info("Running initial release check...")
         await self.tracker.check_for_updates()
 
-        # Start scheduler if enabled
         if config.scheduler.enabled:
             self.logger.info("Starting scheduler...")
             await start_scheduler(self.logger)
@@ -176,13 +179,13 @@ class AniScrapeApp:
 
     async def test_notification(self):
         """Test notifications by rolling back last release"""
-        print("\n🧪 Testing Notification System")
+        print("\n Testing Notification System")
         print("=" * 50)
 
         media_list = await self.db.get_all_tracked_media()
 
         if not media_list:
-            print("❌ No subscriptions found! Subscribe to something first.")
+            print("No subscriptions found! Subscribe to something first.")
             return
 
         print("\nYour subscriptions:")
@@ -194,12 +197,12 @@ class AniScrapeApp:
         choice = input("\nWhich one to test? (enter number): ").strip()
 
         if not choice.isdigit():
-            print("❌ Invalid choice!")
+            print("Invalid choice!")
             return
 
         idx = int(choice) - 1
         if idx < 0 or idx >= len(media_list):
-            print("❌ Invalid choice!")
+            print("Invalid choice!")
             return
 
         media = media_list[idx]
@@ -207,20 +210,20 @@ class AniScrapeApp:
 
         # If no releases yet, run tracker first to establish baseline
         if not latest:
-            print(f"\n⚠️  No releases tracked yet for {media.title_romaji}")
+            print(f"\n No releases tracked yet for {media.title_romaji}")
             print("Running initial tracker check to establish baseline...\n")
             await self.tracker.check_for_updates()
 
             # Check again
             latest = await self.db.get_latest_release_number(media.id)
             if not latest:
-                print("❌ Could not fetch release info from AniList!")
+                print("Could not fetch release info from AniList!")
                 print("This media might not have episode/chapter count available yet.")
                 print("\n💡 Try subscribing to a completed or well-established series for testing.")
                 print("   Example: 'One Piece' manga has chapter counts available.")
                 return
 
-            print(f"✅ Baseline established at {latest}")
+            print(f"Baseline established at {latest}")
 
         # Manually add a test release if we have a baseline
         type_str = "episode" if media.media_type == MediaType.ANIME else "chapter"
@@ -230,23 +233,23 @@ class AniScrapeApp:
         release, is_new = await self.db.add_release(media.id, test_number)
 
         if is_new:
-            print(f"\n✅ Created test release: {type_str} {test_number}")
+            print(f"\nCreated test release: {type_str} {test_number}")
             print("Now sending notification...\n")
 
             # Send notification for this release
             await self.tracker.send_notifications()
 
-            print("\n✅ Test complete! Check your Discord for the notification.")
+            print("\nTest complete! Check your Discord for the notification.")
         else:
-            print(f"❌ Test release {test_number} already exists!")
+            print(f"Test release {test_number} already exists!")
 
 async def main():
 
     parser = argparse.ArgumentParser(description="AniScrape - Anime & Manga Release Tracker")
     parser.add_argument(
-        "--cli",
+        "--manual",
         action="store_true",
-        help="Run in interactive CLI mode (default: daemon mode)"
+        help="Run in interactive manual mode (default: automatic mode)"
     )
     args = parser.parse_args()
 
@@ -262,12 +265,16 @@ async def main():
 
     app = AniScrapeApp(logger, db_url)
 
-    if args.cli:
-        await app.run_cli()
-        os._exit(0)
+    if args.manual:
+        try:
+            await app.run_manual()
+        finally:
+            os._exit(0)
     else:
-        await app.run_daemon()
-
+        try:
+            await app.run_automatic()
+        finally:
+            os._exit(0)
 
 if __name__ == "__main__":
     asyncio.run(main())

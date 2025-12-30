@@ -5,6 +5,7 @@ from app.core.database import DatabaseClient
 from app.core.models import MediaType
 from app.services.anilist_client import AniListClient
 from app.services.discord_notifier import DiscordNotifier
+from app.core.config import config
 
 
 class ReleaseTracker:
@@ -29,58 +30,59 @@ class ReleaseTracker:
             new_releases = []
 
             for media in media_list:
+                media_id = media.id
+                anilist_id = media.anilist_id
+                title_romaji = media.title_romaji
+                title_english = media.title_english
+                media_type = media.media_type
+                media_type_str = "ANIME" if media_type == MediaType.ANIME else "MANGA"
+
                 try:
-
-                    media_type_str = "ANIME" if media.media_type == MediaType.ANIME else "MANGA"
-
-                    media_info = await self.client.get_media_by_id(
-                        media.anilist_id,
-                        media_type_str
-                    )
+                    media_info = await self.client.get_media_by_id(anilist_id, media_type_str)
 
                     if not media_info:
-                        self.logger.warning(f"Could not fetch info for {media.title_romaji}")
+                        self.logger.warning(f"Could not fetch info for {title_romaji}")
                         continue
 
-                    if media.media_type == MediaType.ANIME:
+                    if media_type == MediaType.ANIME:
                         total_count = media_info.get("episodes")
                     else:
                         total_count = media_info.get("chapters")
 
                     if not total_count:
-                        self.logger.debug(f"No episode/chapter count for {media.title_romaji}")
+                        self.logger.debug(f"No episode/chapter count for {title_romaji}")
                         continue
 
-                    latest_in_db = await self.db.get_latest_release_number(media.id)
+                    latest_in_db = await self.db.get_latest_release_number(media_id)
 
                     if latest_in_db is None:
                         self.logger.info(
-                            f"First check for {media.title_romaji}, recording up to "
-                            f"{'episode' if media.media_type == MediaType.ANIME else 'chapter'} {total_count}"
+                            f"First check for {title_romaji}, recording up to "
+                            f"{'episode' if media_type == MediaType.ANIME else 'chapter'} {total_count}"
                         )
-                        await self.db.add_release(media.id, float(total_count))
+                        await self.db.add_release(media_id, float(total_count))
                         continue
 
                     if total_count > latest_in_db:
                         self.logger.info(
-                            f"New releases found for {media.title_romaji}: {latest_in_db} -> {total_count}"
+                            f"New releases found for {title_romaji}: {latest_in_db} -> {total_count}"
                         )
 
                         for number in range(int(latest_in_db) + 1, int(total_count) + 1):
-                            release, is_new = await self.db.add_release(media.id, float(number))
+                            release, is_new = await self.db.add_release(media_id, float(number))
 
                             if is_new:
                                 new_releases.append({
                                     "release_id": release.id,
                                     "number": float(number),
-                                    "anilist_id": media.anilist_id,
-                                    "title_romaji": media.title_romaji,
-                                    "title_english": media.title_english,
-                                    "media_type": media.media_type
+                                    "anilist_id": anilist_id,
+                                    "title_romaji": title_romaji,
+                                    "title_english": title_english,
+                                    "media_type": media_type
                                 })
 
                 except Exception as e:
-                    self.logger.error(f"Error checking {media.title_romaji}: {e}")
+                    self.logger.error(f"Error checking {title_romaji}: {e}")
                     continue
 
             if new_releases:
@@ -93,7 +95,8 @@ class ReleaseTracker:
 
         except Exception as e:
             self.logger.error(f"Error during release check: {e}")
-            self.notifier.send_error(f"Release check failed: {str(e)}")
+            if config.discord.notify_on_error:
+                self.notifier.send_error(f"Release check failed: {str(e)}")
 
     async def send_notifications(self):
         try:
@@ -128,4 +131,5 @@ class ReleaseTracker:
 
         except Exception as e:
             self.logger.error(f"Error sending notifications: {e}")
-            self.notifier.send_error(f"Failed to send notifications: {str(e)}")
+            if config.discord.notify_on_error:
+                self.notifier.send_error(f"Failed to send notifications: {str(e)}")
