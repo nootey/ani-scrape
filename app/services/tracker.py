@@ -53,8 +53,18 @@ class ReleaseTracker:
                         total_count = media_info.get("chapters")
 
                     if not total_count:
-                        self.logger.debug(f"No episode/chapter count for {data['title_romaji']}, setting to 0")
-                        await self.db.add_release(data["media_id"], 0.0)
+                        # Check if we already have a release recorded
+                        latest_in_db = await self.db.get_latest_release_number(data["media_id"])
+
+                        if latest_in_db is None:
+                            # First time seeing this, set to 0
+                            self.logger.debug(f"No episode/chapter count for {data['title_romaji']}, setting to 0")
+                            await self.db.add_release(data["media_id"], 0.0)
+                        else:
+                            # Already have data, just skip (keep existing count)
+                            self.logger.debug(
+                                f"No episode/chapter count for {data['title_romaji']}, keeping existing count {latest_in_db}")
+
                         continue
 
                     latest_in_db = await self.db.get_latest_release_number(data["media_id"])
