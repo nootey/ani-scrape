@@ -6,20 +6,25 @@ import aiohttp
 
 from app.core.config import config
 
+
 class AniListClient:
     def __init__(self, logger: Logger):
         self.logger = logger.getChild("anilist")
         self.api_url = config.anilist.api_url
 
-    async def _query(self, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def _query(
+        self, query: str, variables: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                    self.api_url,
-                    json={"query": query, "variables": variables or {}},
-                    timeout=aiohttp.ClientTimeout(total=30)
+                self.api_url,
+                json={"query": query, "variables": variables or {}},
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as response:
                 if response.status == 429:
-                    self.logger.warning("Rate limited by AniList, waiting 10 seconds...")
+                    self.logger.warning(
+                        "Rate limited by AniList, waiting 10 seconds..."
+                    )
                     await asyncio.sleep(10)
                     return await self._query(query, variables)
 
@@ -38,10 +43,7 @@ class AniListClient:
                 return data.get("data", {})
 
     async def search(
-        self,
-        keyword: str,
-        media_type: str = None,
-        limit: int = 10
+        self, keyword: str, media_type: str = None, limit: int = 10
     ) -> List[Dict[str, Any]]:
         query = """
         query ($search: String, $type: MediaType, $perPage: Int) {
@@ -62,11 +64,7 @@ class AniListClient:
         }
         """
 
-        variables = {
-            "search": keyword,
-            "type": media_type,
-            "perPage": limit
-        }
+        variables = {"search": keyword, "type": media_type, "perPage": limit}
 
         data = await self._query(query, variables)
 
@@ -74,20 +72,24 @@ class AniListClient:
         media_list = data.get("Page", {}).get("media", [])
 
         for media in media_list:
-            results.append({
-                "id": media["id"],
-                "type": media["type"],
-                "title_romaji": media["title"]["romaji"],
-                "title_english": media["title"].get("english"),
-                "episodes": media.get("episodes"),
-                "chapters": media.get("chapters"),
-                "status": media.get("status"),
-                "url": media.get("siteUrl")
-            })
+            results.append(
+                {
+                    "id": media["id"],
+                    "type": media["type"],
+                    "title_romaji": media["title"]["romaji"],
+                    "title_english": media["title"].get("english"),
+                    "episodes": media.get("episodes"),
+                    "chapters": media.get("chapters"),
+                    "status": media.get("status"),
+                    "url": media.get("siteUrl"),
+                }
+            )
 
         return results
 
-    async def get_media_by_id(self, media_id: int, media_type: str) -> Optional[Dict[str, Any]]:
+    async def get_media_by_id(
+        self, media_id: int, media_type: str
+    ) -> Optional[Dict[str, Any]]:
         query = """
         query ($id: Int, $type: MediaType) {
             Media(id: $id, type: $type) {
@@ -105,10 +107,7 @@ class AniListClient:
         }
         """
 
-        variables = {
-            "id": media_id,
-            "type": media_type
-        }
+        variables = {"id": media_id, "type": media_type}
 
         self.logger.debug(f"Fetching {media_type} details for ID: {media_id}")
         data = await self._query(query, variables)
@@ -123,12 +122,14 @@ class AniListClient:
                 "episodes": media.get("episodes"),
                 "chapters": media.get("chapters"),
                 "status": media.get("status"),
-                "url": media.get("siteUrl")
+                "url": media.get("siteUrl"),
             }
 
         return None
 
-    async def get_user_anime_list(self, username: str, status: str = "CURRENT") -> List[Dict[str, Any]]:
+    async def get_user_anime_list(
+        self, username: str, status: str = "CURRENT"
+    ) -> List[Dict[str, Any]]:
         """Get user's anime list"""
         query = """
         query ($username: String, $status: MediaListStatus) {
@@ -158,18 +159,22 @@ class AniListClient:
             for list_group in data["MediaListCollection"]["lists"]:
                 for entry in list_group.get("entries", []):
                     media = entry.get("media", {})
-                    anime_list.append({
-                        "id": media.get("id"),
-                        "type": "ANIME",
-                        "title_romaji": media.get("title", {}).get("romaji"),
-                        "title_english": media.get("title", {}).get("english"),
-                        "episodes": media.get("episodes"),
-                        "status": media.get("status")
-                    })
+                    anime_list.append(
+                        {
+                            "id": media.get("id"),
+                            "type": "ANIME",
+                            "title_romaji": media.get("title", {}).get("romaji"),
+                            "title_english": media.get("title", {}).get("english"),
+                            "episodes": media.get("episodes"),
+                            "status": media.get("status"),
+                        }
+                    )
 
         return anime_list
 
-    async def get_user_manga_list(self, username: str, status: str = "CURRENT") -> List[Dict[str, Any]]:
+    async def get_user_manga_list(
+        self, username: str, status: str = "CURRENT"
+    ) -> List[Dict[str, Any]]:
         """Get user's manga list"""
         query = """
         query ($username: String, $status: MediaListStatus) {
@@ -199,13 +204,15 @@ class AniListClient:
             for list_group in data["MediaListCollection"]["lists"]:
                 for entry in list_group.get("entries", []):
                     media = entry.get("media", {})
-                    manga_list.append({
-                        "id": media.get("id"),
-                        "type": "MANGA",
-                        "title_romaji": media.get("title", {}).get("romaji"),
-                        "title_english": media.get("title", {}).get("english"),
-                        "chapters": media.get("chapters"),
-                        "status": media.get("status")
-                    })
+                    manga_list.append(
+                        {
+                            "id": media.get("id"),
+                            "type": "MANGA",
+                            "title_romaji": media.get("title", {}).get("romaji"),
+                            "title_english": media.get("title", {}).get("english"),
+                            "chapters": media.get("chapters"),
+                            "status": media.get("status"),
+                        }
+                    )
 
         return manga_list

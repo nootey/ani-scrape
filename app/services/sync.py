@@ -15,7 +15,6 @@ class AniListSync:
         self.notifier = DiscordNotifier(logger)
 
     async def sync_from_anilist(self):
-
         username = config.anilist.username
         if not username:
             self.logger.warning("No AniList username configured, skipping sync")
@@ -32,13 +31,15 @@ class AniListSync:
 
             total_synced = 0
             for media in anime_list + manga_list:
-                media_type = MediaType.ANIME if media["type"] == "ANIME" else MediaType.MANGA
+                media_type = (
+                    MediaType.ANIME if media["type"] == "ANIME" else MediaType.MANGA
+                )
 
                 await self.db.add_or_update_media(
                     anilist_id=media["id"],
                     media_type=media_type,
                     title_romaji=media["title_romaji"],
-                    title_english=media["title_english"]
+                    title_english=media["title_english"],
                 )
                 total_synced += 1
 
@@ -71,20 +72,23 @@ class AniListSync:
             to_remove = []
             for media in all_media:
                 if media.anilist_id not in current_ids:
-                    to_remove.append({
-                        'anilist_id': media.anilist_id,
-                        'title': media.title_romaji
-                    })
+                    to_remove.append(
+                        {"anilist_id": media.anilist_id, "title": media.title_romaji}
+                    )
 
             for item in to_remove:
-                await self.db.delete_media(item['anilist_id'])
+                await self.db.delete_media(item["anilist_id"])
                 self.logger.info(f"Unsubscribed from {item['title']}")
                 removed_count += 1
 
             if removed_count > 0:
-                self.logger.info(f"Removed {removed_count} series no longer in your lists")
+                self.logger.info(
+                    f"Removed {removed_count} series no longer in your lists"
+                )
             else:
-                self.logger.info("All subscriptions are still in your WATCHING/READING lists")
+                self.logger.info(
+                    "All subscriptions are still in your WATCHING/READING lists"
+                )
 
         except Exception as e:
             self.logger.error(f"Failed to cleanup series: {e}")

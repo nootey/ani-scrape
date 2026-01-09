@@ -3,7 +3,12 @@ import time
 from logging import Logger
 
 import pytz
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MAX_INSTANCES, JobExecutionEvent
+from apscheduler.events import (
+    EVENT_JOB_ERROR,
+    EVENT_JOB_EXECUTED,
+    EVENT_JOB_MAX_INSTANCES,
+    JobExecutionEvent,
+)
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.config import config
@@ -48,7 +53,9 @@ async def start_scheduler(logger: Logger) -> None:
     def handle_job_executed(event: JobExecutionEvent):
         job = scheduler.get_job(event.job_id)
         if job and job.next_run_time:
-            s_logger.info(f"Next run scheduled at: {job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+            s_logger.info(
+                f"Next run scheduled at: {job.next_run_time.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+            )
 
     def handle_job_error(event: JobExecutionEvent):
         s_logger.error(f"Scheduled job failed: {event.exception}", exc_info=True)
@@ -66,7 +73,9 @@ async def start_scheduler(logger: Logger) -> None:
 
             if time_since_last < cooldown_seconds:
                 wait_time = cooldown_seconds - time_since_last
-                s_logger.info(f"Cooldown active, waiting {wait_time:.1f}s before starting job")
+                s_logger.info(
+                    f"Cooldown active, waiting {wait_time:.1f}s before starting job"
+                )
                 await asyncio.sleep(wait_time)
 
         await run_tracker_job(logger)
@@ -91,7 +100,9 @@ async def start_scheduler(logger: Logger) -> None:
     scheduler.start()
 
     next_run = scheduler.get_jobs()[0].next_run_time
-    s_logger.info(f"Scheduler started - next run at: {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+    s_logger.info(
+        f"Scheduler started - next run at: {next_run.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+    )
 
     try:
         # Keep the scheduler running

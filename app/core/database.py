@@ -18,7 +18,6 @@ from app.core.models import MediaType, Media, Base, Release
 
 
 class DatabaseClient:
-
     def __init__(self, url: str, logger: Logger):
         self.db_connections = threading.local()
         self.url = url
@@ -60,11 +59,11 @@ class DatabaseClient:
         self.logger.debug("Finished creating ORM modules.")
 
     async def add_or_update_media(
-            self,
-            anilist_id: int,
-            media_type: MediaType,
-            title_romaji: str,
-            title_english: Optional[str] = None,
+        self,
+        anilist_id: int,
+        media_type: MediaType,
+        title_romaji: str,
+        title_english: Optional[str] = None,
     ) -> Media:
         session = self.async_scoped_session()
 
@@ -85,7 +84,7 @@ class DatabaseClient:
                 media_type=media_type,
                 title_romaji=title_romaji,
                 title_english=title_english,
-                last_updated_at=datetime.utcnow()
+                last_updated_at=datetime.utcnow(),
             )
             session.add(media)
             self.logger.debug(f"Added new media: {title_romaji}")
@@ -94,7 +93,9 @@ class DatabaseClient:
         await session.refresh(media)
         return media
 
-    async def get_all_tracked_media(self, media_type: Optional[MediaType] = None) -> List[Media]:
+    async def get_all_tracked_media(
+        self, media_type: Optional[MediaType] = None
+    ) -> List[Media]:
         session = self.async_scoped_session()
         stmt = select(Media)
 
@@ -120,18 +121,12 @@ class DatabaseClient:
         return False
 
     async def add_release(
-            self,
-            media_id: int,
-            number: float,
-            released_at: Optional[datetime] = None
+        self, media_id: int, number: float, released_at: Optional[datetime] = None
     ) -> tuple[Release, bool]:
         session = self.async_scoped_session()
 
         stmt = select(Release).where(
-            and_(
-                Release.media_id == media_id,
-                Release.number == number
-            )
+            and_(Release.media_id == media_id, Release.number == number)
         )
         result = await session.execute(stmt)
         existing = result.scalar_one_or_none()
@@ -142,7 +137,7 @@ class DatabaseClient:
         release = Release(
             media_id=media_id,
             number=number,
-            released_at=released_at or datetime.utcnow()
+            released_at=released_at or datetime.utcnow(),
         )
         session.add(release)
         await session.commit()

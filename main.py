@@ -60,9 +60,9 @@ class AniScrapeApp:
             m_type = result["type"]
 
             if m_type == "ANIME":
-                count = f"{result['episodes']} eps" if result['episodes'] else "? eps"
+                count = f"{result['episodes']} eps" if result["episodes"] else "? eps"
             else:
-                count = f"{result['chapters']} chs" if result['chapters'] else "? chs"
+                count = f"{result['chapters']} chs" if result["chapters"] else "? chs"
 
             print(f"{idx}. [{m_type}] {title}")
             print(f"   Romaji: {result['title_romaji']}")
@@ -71,7 +71,7 @@ class AniScrapeApp:
 
         subscribe = input("\nSubscribe to any? (enter number or 'n'): ").strip()
 
-        if subscribe.lower() != 'n' and subscribe.isdigit():
+        if subscribe.lower() != "n" and subscribe.isdigit():
             idx = int(subscribe) - 1
             if 0 <= idx < len(results):
                 await self.subscribe_to_media(results[idx])
@@ -83,7 +83,7 @@ class AniScrapeApp:
             anilist_id=result["id"],
             media_type=media_type,
             title_romaji=result["title_romaji"],
-            title_english=result["title_english"]
+            title_english=result["title_english"],
         )
 
         print(f"\nSubscribed to: {result['title_romaji']}")
@@ -124,7 +124,9 @@ class AniScrapeApp:
 
             latest = await self.db.get_latest_release_number(media.id)
             if latest:
-                type_str = "Episode" if media.media_type == MediaType.ANIME else "Chapter"
+                type_str = (
+                    "Episode" if media.media_type == MediaType.ANIME else "Chapter"
+                )
                 print(f"   Latest: {type_str} {latest}")
 
             print("-" * 80)
@@ -188,7 +190,9 @@ class AniScrapeApp:
         for idx, media in enumerate(media_list, 1):
             latest = await self.db.get_latest_release_number(media.id)
             type_str = "Episode" if media.media_type == MediaType.ANIME else "Chapter"
-            print(f"{idx}. {media.title_romaji} - Latest: {type_str} {latest if latest else 'None'}")
+            print(
+                f"{idx}. {media.title_romaji} - Latest: {type_str} {latest if latest else 'None'}"
+            )
 
         choice = input("\nWhich one to test? (enter number): ").strip()
 
@@ -215,7 +219,9 @@ class AniScrapeApp:
             if not latest:
                 print("Could not fetch release info from AniList!")
                 print("This media might not have episode/chapter count available yet.")
-                print("\n💡 Try subscribing to a completed or well-established series for testing.")
+                print(
+                    "\n💡 Try subscribing to a completed or well-established series for testing."
+                )
                 print("   Example: 'One Piece' manga has chapter counts available.")
                 return
 
@@ -239,13 +245,15 @@ class AniScrapeApp:
         else:
             print(f"Test release {test_number} already exists!")
 
-async def main():
 
-    parser = argparse.ArgumentParser(description="AniScrape - Anime & Manga Release Tracker")
+async def main():
+    parser = argparse.ArgumentParser(
+        description="AniScrape - Anime & Manga Release Tracker"
+    )
     parser.add_argument(
         "--manual",
         action="store_true",
-        help="Run in interactive manual mode (default: automatic mode)"
+        help="Run in interactive manual mode (default: automatic mode)",
     )
     args = parser.parse_args()
 
@@ -271,6 +279,7 @@ async def main():
             await app.run_automatic()
         finally:
             os._exit(0)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

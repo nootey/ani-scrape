@@ -15,7 +15,9 @@ class DiscordNotifier:
 
     def notify_new_releases(self, releases: List[Dict[str, Any]]):
         if not self.webhook_url:
-            self.logger.warning("Discord webhook URL not configured, skipping notifications")
+            self.logger.warning(
+                "Discord webhook URL not configured, skipping notifications"
+            )
             return
 
         if not releases:
@@ -26,7 +28,7 @@ class DiscordNotifier:
 
         batch_size = 10
         for i in range(0, len(releases), batch_size):
-            batch = releases[i:i + batch_size]
+            batch = releases[i : i + batch_size]
             self._send_batch(batch)
 
             # Small delay between batches to avoid rate limits
@@ -63,12 +65,18 @@ class DiscordNotifier:
             response = requests.post(self.webhook_url, json=payload, headers=headers)
 
             if response.status_code not in (200, 204):
-                self.logger.warning(f"Failed to send batch to Discord: {response.status_code} - {response.text}")
+                self.logger.warning(
+                    f"Failed to send batch to Discord: {response.status_code} - {response.text}"
+                )
             else:
-                self.logger.info(f"Discord batch sent successfully ({len(embeds)} releases)")
+                self.logger.info(
+                    f"Discord batch sent successfully ({len(embeds)} releases)"
+                )
 
         except Exception as e:
-            self.logger.exception(f"Exception occurred while sending batch to Discord: {e}")
+            self.logger.exception(
+                f"Exception occurred while sending batch to Discord: {e}"
+            )
 
     def send_error(self, error_message: str, details: str = None):
         if not self.webhook_url:
@@ -95,9 +103,13 @@ class DiscordNotifier:
             response = requests.post(self.webhook_url, json=payload, headers=headers)
 
             if response.status_code not in (200, 204):
-                self.logger.warning(f"Failed to send error to Discord: {response.status_code}")
+                self.logger.warning(
+                    f"Failed to send error to Discord: {response.status_code}"
+                )
             else:
                 self.logger.info("Discord error notification sent successfully")
 
         except Exception as e:
-            self.logger.exception(f"Exception occurred while sending error to Discord: {e}")
+            self.logger.exception(
+                f"Exception occurred while sending error to Discord: {e}"
+            )

@@ -13,9 +13,11 @@ class DatabaseConfig(BaseModel):
     path: str = "./storage/db/aniscrape.sqlite"
     auto_flush: bool = True
 
+
 class DiscordConfig(BaseModel):
     webhook_url: str
     notify_on_error: bool = False
+
 
 class SchedulerConfig(BaseModel):
     interval_hours: int = 1
