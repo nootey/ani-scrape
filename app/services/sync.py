@@ -67,14 +67,19 @@ class AniListSync:
             all_media = await self.db.get_all_tracked_media()
             removed_count = 0
 
+            # Build a list of media to remove
+            to_remove = []
             for media in all_media:
-                media_id = media.anilist_id
-                title = media.title_romaji
+                if media.anilist_id not in current_ids:
+                    to_remove.append({
+                        'anilist_id': media.anilist_id,
+                        'title': media.title_romaji
+                    })
 
-                if media_id not in current_ids:
-                    await self.db.delete_media(media_id)
-                    self.logger.info(f"Unsubscribed from {title}")
-                    removed_count += 1
+            for item in to_remove:
+                await self.db.delete_media(item['anilist_id'])
+                self.logger.info(f"Unsubscribed from {item['title']}")
+                removed_count += 1
 
             if removed_count > 0:
                 self.logger.info(f"Removed {removed_count} series no longer in your lists")
