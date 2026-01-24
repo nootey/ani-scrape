@@ -1,3 +1,4 @@
+import asyncio
 from logging import Logger
 
 from app.core.database import DatabaseClient
@@ -71,6 +72,7 @@ class ReleaseTracker:
                                 total_count = await self.mu_client.get_latest_chapter(
                                     mu_id
                                 )
+                                await asyncio.sleep(0.5)  # Add 500ms delay
                                 if total_count:
                                     self.logger.debug(
                                         f"MangaUpdates found {total_count} chapters"
