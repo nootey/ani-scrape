@@ -28,6 +28,7 @@ class Media(Base):
     anilist_id: Mapped[int] = mapped_column(
         Integer, unique=True, nullable=False, index=True
     )
+    mangaupdates_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     media_type: Mapped[MediaType] = mapped_column(SQLEnum(MediaType), nullable=False)
 
