@@ -1,3 +1,7 @@
+# Logging configuration
+logging:
+  level: INFO  # DEBUG, WARNING, ERROR
+
 # App configuration
 anilist:
   api_url: "https://graphql.anilist.co"

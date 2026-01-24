@@ -5,6 +5,7 @@ from app.core.models import MediaType
 from app.services.anilist_client import AniListClient
 from app.services.discord_notifier import DiscordNotifier
 from app.core.config import config
+from app.services.mangaupdates_client import MangaUpdatesClient
 
 
 class ReleaseTracker:
@@ -13,6 +14,7 @@ class ReleaseTracker:
         self.db = db
         self.client = AniListClient(logger)
         self.notifier = DiscordNotifier(logger)
+        self.mu_client = MangaUpdatesClient(logger)
 
     async def check_for_updates(self):
         self.logger.info("Starting release check...")
@@ -24,111 +26,140 @@ class ReleaseTracker:
                 self.logger.info("No media being tracked")
                 return
 
-            media_data = []
+            self.logger.info(f"Checking {len(media_list)} media for updates")
+
+            notifications = []
+            updates_to_make = []
+
             for media in media_list:
-                media_data.append(
-                    {
-                        "media_id": media.id,
-                        "anilist_id": media.anilist_id,
-                        "title_romaji": media.title_romaji,
-                        "title_english": media.title_english,
-                        "media_type": media.media_type,
-                        "media_type_str": "ANIME"
-                        if media.media_type == MediaType.ANIME
-                        else "MANGA",
-                    }
-                )
-
-            self.logger.info(f"Checking {len(media_data)} media for updates")
-
-            new_releases = []
-
-            for data in media_data:
-                try:
-                    media_info = await self.client.get_media_by_id(
-                        data["anilist_id"], data["media_type_str"]
+                # Skip if user hasn't logged any progress
+                if not media.user_progress or media.user_progress == 0:
+                    self.logger.debug(
+                        f"Skipping {media.title_romaji} - no user progress logged"
                     )
-
-                    if not media_info:
-                        self.logger.warning(
-                            f"Could not fetch info for {data['title_romaji']}"
-                        )
-                        continue
-
-                    if data["media_type"] == MediaType.ANIME:
-                        total_count = media_info.get("episodes")
-                    else:
-                        total_count = media_info.get("chapters")
-
-                    if not total_count:
-                        # Check if we already have a release recorded
-                        latest_in_db = await self.db.get_latest_release_number(
-                            data["media_id"]
-                        )
-
-                        if latest_in_db is None:
-                            # First time seeing this, set to 0
-                            self.logger.debug(
-                                f"No episode/chapter count for {data['title_romaji']}, setting to 0"
-                            )
-                            await self.db.add_release(data["media_id"], 0.0)
-                        else:
-                            # Already have data, just skip (keep existing count)
-                            self.logger.debug(
-                                f"No episode/chapter count for {data['title_romaji']}, keeping existing count {latest_in_db}"
-                            )
-
-                        continue
-
-                    latest_in_db = await self.db.get_latest_release_number(
-                        data["media_id"]
-                    )
-
-                    if latest_in_db is None:
-                        type_label = (
-                            "episode"
-                            if data["media_type"] == MediaType.ANIME
-                            else "chapter"
-                        )
-                        self.logger.info(
-                            f"First check for {data['title_romaji']}, recording up to {type_label} {total_count}"
-                        )
-                        await self.db.add_release(data["media_id"], float(total_count))
-                        continue
-
-                    if total_count > latest_in_db:
-                        self.logger.info(
-                            f"New releases found for {data['title_romaji']}: {latest_in_db} -> {total_count}"
-                        )
-
-                        for number in range(
-                            int(latest_in_db) + 1, int(total_count) + 1
-                        ):
-                            release, is_new = await self.db.add_release(
-                                data["media_id"], float(number)
-                            )
-
-                            if is_new:
-                                new_releases.append(
-                                    {
-                                        "release_id": release.id,
-                                        "number": float(number),
-                                        "anilist_id": data["anilist_id"],
-                                        "title_romaji": data["title_romaji"],
-                                        "title_english": data["title_english"],
-                                        "media_type": data["media_type"],
-                                    }
-                                )
-
-                except Exception as e:
-                    self.logger.error(f"Error checking {data['title_romaji']}: {e}")
                     continue
 
-            if new_releases:
-                self.logger.info(
-                    f"Found {len(new_releases)} new releases, sending notifications"
-                )
-                await self.send_notifications()
+                try:
+                    total_count = None
+
+                    # ANIME: Always use AniList
+                    if media.media_type == MediaType.ANIME:
+                        try:
+                            self.logger.debug(
+                                f"Checking AniList for anime {media.title_romaji}"
+                            )
+                            media_info = await self.client.get_media_by_id(
+                                media.anilist_id, "ANIME"
+                            )
+                            if media_info:
+                                total_count = media_info.get("episodes")
+                        except Exception as e:
+                            self.logger.warning(
+                                f"AniList failed for {media.title_romaji}: {e}"
+                            )
+
+                    # MANGA: Try MangaUpdates first, fallback to AniList
+                    elif media.media_type == MediaType.MANGA:
+                        try:
+                            self.logger.debug(
+                                f"Checking MangaUpdates for {media.title_romaji}"
+                            )
+                            mu_id = await self.mu_client.search_by_title(
+                                media.title_romaji
+                            )
+                            if mu_id:
+                                total_count = await self.mu_client.get_latest_chapter(
+                                    mu_id
+                                )
+                                if total_count:
+                                    self.logger.debug(
+                                        f"MangaUpdates found {total_count} chapters"
+                                    )
+                        except Exception as e:
+                            self.logger.warning(
+                                f"MangaUpdates failed for {media.title_romaji}: {e}"
+                            )
+
+                        if not total_count:
+                            try:
+                                self.logger.debug(
+                                    f"Falling back to AniList for manga {media.title_romaji}"
+                                )
+                                media_info = await self.client.get_media_by_id(
+                                    media.anilist_id, "MANGA"
+                                )
+                                if media_info:
+                                    total_count = media_info.get("chapters")
+                            except Exception as e:
+                                self.logger.warning(
+                                    f"AniList fallback failed for {media.title_romaji}: {e}"
+                                )
+
+                    if not total_count:
+                        self.logger.debug(
+                            f"No count available for {media.title_romaji}, keeping previous value"
+                        )
+                        continue
+
+                    # Check if this is the first time we're tracking this media
+                    # If last_checked_count is None, this is the first check - just store state, don't notify
+                    if media.last_checked_count is None:
+                        self.logger.info(
+                            f"Initial state for {media.title_romaji}: {total_count} available"
+                        )
+                        updates_to_make.append((media.id, float(total_count)))
+                        continue
+
+                    # Check if there are new releases since last check
+                    last_known = media.last_checked_count
+
+                    if total_count > last_known:
+                        type_label = (
+                            "episode"
+                            if media.media_type == MediaType.ANIME
+                            else "chapter"
+                        )
+
+                        self.logger.info(
+                            f"New {type_label}(s) for {media.title_romaji}: "
+                            f"was {last_known}, now {total_count}"
+                        )
+
+                        for number in range(int(last_known) + 1, int(total_count) + 1):
+                            notifications.append(
+                                {
+                                    "number": float(number),
+                                    "anilist_id": media.anilist_id,
+                                    "title_romaji": media.title_romaji,
+                                    "title_english": media.title_english,
+                                    "media_type": media.media_type,
+                                }
+                            )
+
+                        updates_to_make.append((media.id, float(total_count)))
+
+                except Exception as e:
+                    self.logger.error(f"Error checking {media.title_romaji}: {e}")
+                    continue
+
+            # Update database with new counts
+            for media_id, new_count in updates_to_make:
+                try:
+                    await self.db.update_media_count(media_id, new_count)
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to update count for media_id {media_id}: {e}"
+                    )
+
+            # Send notifications
+            if notifications:
+                try:
+                    self.logger.info(
+                        f"Found {len(notifications)} new releases, sending notifications"
+                    )
+                    self.notifier.notify_new_releases(notifications)
+                except Exception as e:
+                    self.logger.error(f"Failed to send notifications: {e}")
             else:
                 self.logger.info("No new releases found")
 
@@ -137,42 +168,9 @@ class ReleaseTracker:
         except Exception as e:
             self.logger.error(f"Error during release check: {e}")
             if config.discord.notify_on_error:
-                self.notifier.send_error(f"Release check failed: {str(e)}")
-
-    async def send_notifications(self):
-        try:
-            releases = await self.db.get_unnotified_releases()
-
-            if not releases:
-                self.logger.info("No pending notifications")
-                return
-
-            self.logger.info(f"Sending notifications for {len(releases)} releases")
-
-            notification_data = []
-            release_ids = []
-
-            for release in releases:
-                release_ids.append(release.id)
-                notification_data.append(
-                    {
-                        "release_id": release.id,
-                        "number": release.number,
-                        "anilist_id": release.media.anilist_id,
-                        "title_romaji": release.media.title_romaji,
-                        "title_english": release.media.title_english,
-                        "media_type": release.media.media_type,
-                    }
-                )
-
-            self.notifier.notify_new_releases(notification_data)
-
-            for release_id in release_ids:
-                await self.db.mark_as_notified(release_id)
-
-            self.logger.info("All notifications sent successfully")
-
-        except Exception as e:
-            self.logger.error(f"Error sending notifications: {e}")
-            if config.discord.notify_on_error:
-                self.notifier.send_error(f"Failed to send notifications: {str(e)}")
+                try:
+                    self.notifier.send_error(f"Release check failed: {str(e)}")
+                except Exception as notify_error:
+                    self.logger.error(
+                        f"Failed to send error notification: {notify_error}"
+                    )
