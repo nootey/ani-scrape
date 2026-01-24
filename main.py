@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import logging
 import os
 from logging import Logger
 from pathlib import Path
@@ -189,7 +190,8 @@ async def main():
     )
     args = parser.parse_args()
 
-    logger = AppLogger(name="app").get_logger()
+    log_level = getattr(logging, config.logging.level.upper(), logging.INFO)
+    logger = AppLogger(name="app", level=log_level).get_logger()
     logger.info("Starting ani-scrape")
 
     # Ensure database directory exists
