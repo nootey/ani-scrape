@@ -42,6 +42,7 @@ class ReleaseTracker:
                 try:
                     total_count = None
 
+                    # ANIME: Always use AniList
                     if media.media_type == MediaType.ANIME:
                         try:
                             self.logger.debug(
@@ -57,7 +58,7 @@ class ReleaseTracker:
                                 f"AniList failed for {media.title_romaji}: {e}"
                             )
 
-                    # For manga, try MangaUpdates first, fallback to AniList
+                    # MANGA: Try MangaUpdates first, fallback to AniList
                     elif media.media_type == MediaType.MANGA:
                         try:
                             self.logger.debug(
@@ -100,8 +101,17 @@ class ReleaseTracker:
                         )
                         continue
 
+                    # Check if this is the first time we're tracking this media
+                    # If last_checked_count is None, this is the first check - just store state, don't notify
+                    if media.last_checked_count is None:
+                        self.logger.info(
+                            f"Initial state for {media.title_romaji}: {total_count} available"
+                        )
+                        updates_to_make.append((media.id, float(total_count)))
+                        continue
+
                     # Check if there are new releases since last check
-                    last_known = media.last_checked_count or media.user_progress
+                    last_known = media.last_checked_count
 
                     if total_count > last_known:
                         type_label = (
