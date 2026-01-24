@@ -23,7 +23,7 @@ class AniScrapeApp:
         self.sync = AniListSync(logger, self.db)
 
     async def search_media(self):
-        print("\n Anime/Manga search")
+        print("\n🔍 Anime/Manga search")
         print("=" * 50)
 
         keyword = input("Enter search keyword: ").strip()
@@ -86,11 +86,11 @@ class AniScrapeApp:
             title_english=result["title_english"],
         )
 
-        print(f"\nSubscribed to: {result['title_romaji']}")
+        print(f"\n✅ Subscribed to: {result['title_romaji']}")
 
     async def view_subscriptions(self):
         """View all subscribed media"""
-        print("\nYour Subscriptions")
+        print("\n📋 Your Subscriptions")
         print("=" * 50)
 
         print("\nView:")
@@ -120,15 +120,20 @@ class AniScrapeApp:
             print(f"{idx}. [{media.media_type.value}] {title}")
             print(f"   Romaji: {media.title_romaji}")
             print(f"   AniList ID: {media.anilist_id}")
-            print(f"   Last updated: {media.last_updated_at}")
 
-            latest = await self.db.get_latest_release_number(media.id)
-            if latest:
+            if media.user_progress:
                 type_str = (
                     "Episode" if media.media_type == MediaType.ANIME else "Chapter"
                 )
-                print(f"   Latest: {type_str} {latest}")
+                print(f"   Your progress: {type_str} {int(media.user_progress)}")
 
+            if media.last_checked_count:
+                type_str = (
+                    "Episodes" if media.media_type == MediaType.ANIME else "Chapters"
+                )
+                print(f"   Available: {int(media.last_checked_count)} {type_str}")
+
+            print(f"   Last updated: {media.last_updated_at}")
             print("-" * 80)
 
     async def show_menu(self):
@@ -138,8 +143,7 @@ class AniScrapeApp:
             print("=" * 50)
             print("\n1. Search & Subscribe")
             print("2. View Subscriptions")
-            print("3. Test Notifications")
-            print("4. Exit")
+            print("3. Exit")
 
             choice = input("\nChoice: ").strip()
 
@@ -148,9 +152,7 @@ class AniScrapeApp:
             elif choice == "2":
                 await self.view_subscriptions()
             elif choice == "3":
-                await self.test_notification()
-            elif choice == "4":
-                print("\n Exiting ...")
+                print("\n👋 Exiting...")
                 return
             else:
                 print("\n❌ Invalid choice!")
@@ -174,76 +176,6 @@ class AniScrapeApp:
 
         self.logger.info("Starting scheduler...")
         await start_scheduler(self.logger)
-
-    async def test_notification(self):
-        """Test notifications by rolling back last release"""
-        print("\n Testing Notification System")
-        print("=" * 50)
-
-        media_list = await self.db.get_all_tracked_media()
-
-        if not media_list:
-            print("No subscriptions found! Subscribe to something first.")
-            return
-
-        print("\nYour subscriptions:")
-        for idx, media in enumerate(media_list, 1):
-            latest = await self.db.get_latest_release_number(media.id)
-            type_str = "Episode" if media.media_type == MediaType.ANIME else "Chapter"
-            print(
-                f"{idx}. {media.title_romaji} - Latest: {type_str} {latest if latest else 'None'}"
-            )
-
-        choice = input("\nWhich one to test? (enter number): ").strip()
-
-        if not choice.isdigit():
-            print("Invalid choice!")
-            return
-
-        idx = int(choice) - 1
-        if idx < 0 or idx >= len(media_list):
-            print("Invalid choice!")
-            return
-
-        media = media_list[idx]
-        latest = await self.db.get_latest_release_number(media.id)
-
-        # If no releases yet, run tracker first to establish baseline
-        if not latest:
-            print(f"\n No releases tracked yet for {media.title_romaji}")
-            print("Running initial tracker check to establish baseline...\n")
-            await self.tracker.check_for_updates()
-
-            # Check again
-            latest = await self.db.get_latest_release_number(media.id)
-            if not latest:
-                print("Could not fetch release info from AniList!")
-                print("This media might not have episode/chapter count available yet.")
-                print(
-                    "\n💡 Try subscribing to a completed or well-established series for testing."
-                )
-                print("   Example: 'One Piece' manga has chapter counts available.")
-                return
-
-            print(f"Baseline established at {latest}")
-
-        # Manually add a test release if we have a baseline
-        type_str = "episode" if media.media_type == MediaType.ANIME else "chapter"
-
-        # Create a fake "new" release
-        test_number = latest + 1
-        release, is_new = await self.db.add_release(media.id, test_number)
-
-        if is_new:
-            print(f"\nCreated test release: {type_str} {test_number}")
-            print("Now sending notification...\n")
-
-            # Send notification for this release
-            await self.tracker.send_notifications()
-
-            print("\nTest complete! Check your Discord for the notification.")
-        else:
-            print(f"Test release {test_number} already exists!")
 
 
 async def main():

@@ -4,7 +4,7 @@ from datetime import datetime
 from logging import Logger
 from typing import Optional, List
 
-from sqlalchemy import select, and_, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,9 +12,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import joinedload
 
-from app.core.models import MediaType, Media, Base, Release
+from app.core.models import MediaType, Media, Base
 
 
 class DatabaseClient:
@@ -64,6 +63,7 @@ class DatabaseClient:
         media_type: MediaType,
         title_romaji: str,
         title_english: Optional[str] = None,
+        user_progress: Optional[float] = None,
     ) -> Media:
         session = self.async_scoped_session()
 
@@ -75,8 +75,10 @@ class DatabaseClient:
             # Update existing
             media.title_romaji = title_romaji
             media.title_english = title_english
+            if user_progress is not None:
+                media.user_progress = user_progress
             media.last_updated_at = datetime.utcnow()
-            self.logger.debug(f"Updated media: {title_romaji}")
+            self.logger.info(f"Updated media: {title_romaji}")
         else:
             # Create new
             media = Media(
@@ -84,14 +86,29 @@ class DatabaseClient:
                 media_type=media_type,
                 title_romaji=title_romaji,
                 title_english=title_english,
+                user_progress=user_progress,
                 last_updated_at=datetime.utcnow(),
             )
             session.add(media)
-            self.logger.debug(f"Added new media: {title_romaji}")
+            self.logger.info(f"Added new media: {title_romaji}")
 
         await session.commit()
         await session.refresh(media)
         return media
+
+    async def update_media_count(self, media_id: int, new_count: float):
+        """Update the last checked count for a media"""
+        from sqlalchemy import update
+
+        session = self.async_scoped_session()
+
+        stmt = (
+            update(Media)
+            .where(Media.id == media_id)
+            .values(last_checked_count=new_count, last_updated_at=datetime.utcnow())
+        )
+        await session.execute(stmt)
+        await session.commit()
 
     async def get_all_tracked_media(
         self, media_type: Optional[MediaType] = None
@@ -119,62 +136,3 @@ class DatabaseClient:
             self.logger.info(f"Deleted media: {title}")
             return True
         return False
-
-    async def add_release(
-        self, media_id: int, number: float, released_at: Optional[datetime] = None
-    ) -> tuple[Release, bool]:
-        session = self.async_scoped_session()
-
-        stmt = select(Release).where(
-            and_(Release.media_id == media_id, Release.number == number)
-        )
-        result = await session.execute(stmt)
-        existing = result.scalar_one_or_none()
-
-        if existing:
-            return existing, False
-
-        release = Release(
-            media_id=media_id,
-            number=number,
-            released_at=released_at or datetime.utcnow(),
-        )
-        session.add(release)
-        await session.commit()
-        await session.refresh(release)
-
-        self.logger.info(f"New release {number} added for media_id={media_id}")
-
-        return release, True
-
-    async def get_latest_release_number(self, media_id: int) -> Optional[float]:
-        session = self.async_scoped_session()
-        stmt = select(func.max(Release.number)).where(Release.media_id == media_id)
-        result = await session.execute(stmt)
-        return result.scalar_one_or_none()
-
-    async def get_unnotified_releases(self) -> List[Release]:
-        session = self.async_scoped_session()
-        stmt = (
-            select(Release)
-            .options(joinedload(Release.media))
-            .where(Release.notified.is_(False))
-            .order_by(Release.created_at.desc())
-        )
-        result = await session.execute(stmt)
-        return list(result.scalars().all())
-
-    async def mark_as_notified(self, release_id: int):
-        session = self.async_scoped_session()
-
-        from sqlalchemy import update
-
-        stmt = (
-            update(Release)
-            .where(Release.id == release_id)
-            .values(notified=True, notified_at=datetime.utcnow())
-        )
-        await session.execute(stmt)
-        await session.commit()
-
-        self.logger.debug(f"Marked release {release_id} as notified")

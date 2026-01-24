@@ -35,11 +35,14 @@ class AniListSync:
                     MediaType.ANIME if media["type"] == "ANIME" else MediaType.MANGA
                 )
 
+                user_progress = media.get("progress", 0)
+
                 await self.db.add_or_update_media(
                     anilist_id=media["id"],
                     media_type=media_type,
                     title_romaji=media["title_romaji"],
                     title_english=media["title_english"],
+                    user_progress=float(user_progress) if user_progress else None,
                 )
                 total_synced += 1
 

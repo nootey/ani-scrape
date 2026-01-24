@@ -109,7 +109,6 @@ class AniListClient:
 
         variables = {"id": media_id, "type": media_type}
 
-        self.logger.debug(f"Fetching {media_type} details for ID: {media_id}")
         data = await self._query(query, variables)
 
         if data.get("Media"):
@@ -136,6 +135,7 @@ class AniListClient:
             MediaListCollection(userName: $username, type: ANIME, status: $status) {
                 lists {
                     entries {
+                        progress
                         media {
                             id
                             title {
@@ -167,6 +167,7 @@ class AniListClient:
                             "title_english": media.get("title", {}).get("english"),
                             "episodes": media.get("episodes"),
                             "status": media.get("status"),
+                            "progress": entry.get("progress", 0),  # ADD THIS LINE
                         }
                     )
 
@@ -181,6 +182,7 @@ class AniListClient:
             MediaListCollection(userName: $username, type: MANGA, status: $status) {
                 lists {
                     entries {
+                        progress
                         media {
                             id
                             title {
@@ -212,6 +214,7 @@ class AniListClient:
                             "title_english": media.get("title", {}).get("english"),
                             "chapters": media.get("chapters"),
                             "status": media.get("status"),
+                            "progress": entry.get("progress", 0),  # ADD THIS LINE
                         }
                     )
 
