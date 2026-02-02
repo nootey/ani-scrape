@@ -1,3 +1,4 @@
+import asyncio
 from logging import Logger
 
 from app.core.config import config
@@ -50,6 +51,9 @@ class AniListSync:
 
             await self.cleanup_finished_series()
 
+        except asyncio.CancelledError:
+            self.logger.warning("AniList sync cancelled")
+            raise
         except Exception as e:
             self.logger.error(f"Failed to sync from AniList: {e}")
             if config.discord.notify_on_error:
@@ -93,6 +97,9 @@ class AniListSync:
                     "All subscriptions are still in your WATCHING/READING lists"
                 )
 
+        except asyncio.CancelledError:
+            self.logger.warning("Cleanup cancelled")
+            raise
         except Exception as e:
             self.logger.error(f"Failed to cleanup series: {e}")
             if config.discord.notify_on_error:

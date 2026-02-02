@@ -140,6 +140,9 @@ class ReleaseTracker:
 
                         updates_to_make.append((media.id, float(total_count)))
 
+                except asyncio.CancelledError:
+                    self.logger.warning("Cancelled while checking media")
+                    raise
                 except Exception as e:
                     self.logger.error(f"Error checking {media.title_romaji}: {e}")
                     continue
@@ -167,6 +170,9 @@ class ReleaseTracker:
 
             self.logger.info("Release check complete")
 
+        except asyncio.CancelledError:
+            self.logger.warning("Release check cancelled")
+            raise
         except Exception as e:
             self.logger.error(f"Error during release check: {e}")
             if config.discord.notify_on_error:

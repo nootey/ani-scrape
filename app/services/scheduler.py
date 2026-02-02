@@ -16,10 +16,12 @@ from app.core.database import DatabaseClient
 from app.services.sync import AniListSync
 from app.services.tracker import ReleaseTracker
 
-
-async def run_tracker_job(logger: Logger):
+async def run_scrape_job(logger: Logger, retry_count: int = 0):
     start = time.time()
-    logger.info("Scheduled release check triggered")
+    max_retries = 3
+    retry_delay = 60  # seconds
+
+    logger.info(f"Scheduled scrape triggered (attempt {retry_count + 1}/{max_retries + 1})")
     db_client = None
 
     try:
@@ -39,7 +41,18 @@ async def run_tracker_job(logger: Logger):
         logger.info(f"Release check completed in {elapsed:.2f} seconds")
 
     except Exception as e:
-        logger.error(f"Scheduled release check failed: {e}", exc_info=True)
+        elapsed = time.time() - start
+        error_msg = f"Scheduled scrape failed after {elapsed:.2f}s: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+
+        if retry_count < max_retries:
+            logger.warning(f"Retrying in {retry_delay}s...")
+            await asyncio.sleep(retry_delay)
+            return await run_scrape_job(logger, retry_count + 1)
+        else:
+            logger.error("Max retries reached, giving up")
+            return False
+
     finally:
         if db_client:
             await db_client.cleanup()
@@ -63,22 +76,49 @@ async def start_scheduler(logger: Logger) -> None:
     def handle_max_instances(event: JobExecutionEvent):
         s_logger.warning("Tracker job still running, skipping this interval")
 
-    async def run_tracker_job_with_cooldown(logger: Logger):
+    async def run_scrape_job_with_cooldown(logger: Logger):
         nonlocal last_job_end_time
 
-        # Check if we need to wait for cooldown
+        job_start = time.time()
+        s_logger.info(f"Job starting at {time.strftime('%H:%M:%S')}")
+
+        # Cooldown check
         if last_job_end_time is not None:
             time_since_last = time.time() - last_job_end_time
-            cooldown_seconds = 60  # 1 minute minimum
+            cooldown_seconds = 60
 
             if time_since_last < cooldown_seconds:
                 wait_time = cooldown_seconds - time_since_last
-                s_logger.info(
-                    f"Cooldown active, waiting {wait_time:.1f}s before starting job"
-                )
+                s_logger.info(f"Cooldown active, waiting {wait_time:.1f}s before starting job")
                 await asyncio.sleep(wait_time)
 
-        await run_tracker_job(logger)
+        # Create task with cancellation
+        timeout_seconds = (config.scheduler.interval_minutes * 60) - 30  # 30s buffer
+        scrape_task = asyncio.create_task(run_scrape_job(logger))
+
+        try:
+            await asyncio.wait_for(scrape_task, timeout=timeout_seconds)
+            s_logger.info("Scrape completed successfully")
+        except asyncio.TimeoutError:
+            error_msg = f"Scrape exceeded timeout of {timeout_seconds}s - CANCELLING TASK"
+            s_logger.error(error_msg)
+            scrape_task.cancel()
+
+            try:
+                # Wait for cancellation to propagate
+                await asyncio.wait_for(scrape_task, timeout=10)
+            except (asyncio.CancelledError, asyncio.TimeoutError):
+                s_logger.warning("Task cancelled or force-stopped after timeout")
+
+        # Calculate and log duration
+        job_duration = time.time() - job_start
+        s_logger.info(f"Job completed in {job_duration:.1f}s")
+
+        # Warn if approaching interval limit
+        interval_seconds = config.scheduler.interval_minutes * 60
+        if job_duration > (interval_seconds * 0.8):
+            warning = f"⚠️ Scrape took {job_duration:.1f}s ({job_duration / 60:.1f}min), close to {interval_seconds}s interval."
+            s_logger.warning(warning)
 
         last_job_end_time = time.time()
 
@@ -89,7 +129,7 @@ async def start_scheduler(logger: Logger) -> None:
     timezone = pytz.timezone(config.scheduler.timezone)
 
     scheduler.add_job(
-        run_tracker_job_with_cooldown,
+        run_scrape_job_with_cooldown,
         "interval",
         args=[s_logger],
         hours=config.scheduler.interval_hours,
@@ -111,3 +151,6 @@ async def start_scheduler(logger: Logger) -> None:
     except (KeyboardInterrupt, SystemExit):
         s_logger.info("Scheduler shutting down gracefully")
         scheduler.shutdown()
+    except Exception as e:
+        s_logger.error(f"Scheduler crashed: {e}", exc_info=True)
+        raise
