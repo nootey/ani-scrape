@@ -16,12 +16,15 @@ from app.core.database import DatabaseClient
 from app.services.sync import AniListSync
 from app.services.tracker import ReleaseTracker
 
+
 async def run_scrape_job(logger: Logger, retry_count: int = 0):
     start = time.time()
     max_retries = 3
     retry_delay = 60  # seconds
 
-    logger.info(f"Scheduled scrape triggered (attempt {retry_count + 1}/{max_retries + 1})")
+    logger.info(
+        f"Scheduled scrape triggered (attempt {retry_count + 1}/{max_retries + 1})"
+    )
     db_client = None
 
     try:
@@ -89,18 +92,22 @@ async def start_scheduler(logger: Logger) -> None:
 
             if time_since_last < cooldown_seconds:
                 wait_time = cooldown_seconds - time_since_last
-                s_logger.info(f"Cooldown active, waiting {wait_time:.1f}s before starting job")
+                s_logger.info(
+                    f"Cooldown active, waiting {wait_time:.1f}s before starting job"
+                )
                 await asyncio.sleep(wait_time)
 
         # Create task with cancellation
-        timeout_seconds = (config.scheduler.interval_minutes * 60) - 30  # 30s buffer
+        timeout_seconds = 90
         scrape_task = asyncio.create_task(run_scrape_job(logger))
 
         try:
             await asyncio.wait_for(scrape_task, timeout=timeout_seconds)
             s_logger.info("Scrape completed successfully")
         except asyncio.TimeoutError:
-            error_msg = f"Scrape exceeded timeout of {timeout_seconds}s - CANCELLING TASK"
+            error_msg = (
+                f"Scrape exceeded timeout of {timeout_seconds}s - CANCELLING TASK"
+            )
             s_logger.error(error_msg)
             scrape_task.cancel()
 
