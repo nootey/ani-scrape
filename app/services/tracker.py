@@ -49,15 +49,17 @@ class ReleaseTracker:
                             self.logger.debug(
                                 f"Checking AniList for anime {media.title_romaji}"
                             )
-                            media_info = await self.client.get_media_by_id(
-                                media.anilist_id, "ANIME"
-                            )
+                            media_info = await self.client.get_media_by_id(media.anilist_id, "ANIME")
                             if media_info:
-                                total_count = media_info.get("episodes")
+                                next_airing = media_info.get("next_airing_episode")
+                                if next_airing and next_airing.get("episode"):
+                                    # next_airing.episode is the upcoming one, so -1 = latest aired
+                                    total_count = next_airing["episode"] - 1
+                                else:
+                                    # Show is finished or all episodes known
+                                    total_count = media_info.get("episodes")
                         except Exception as e:
-                            self.logger.warning(
-                                f"AniList failed for {media.title_romaji}: {e}"
-                            )
+                            self.logger.warning(f"AniList failed for {media.title_romaji}: {e}")
 
                     # MANGA: Try MangaUpdates first, fallback to AniList
                     elif media.media_type == MediaType.MANGA:
@@ -114,6 +116,15 @@ class ReleaseTracker:
 
                     # Check if there are new releases since last check
                     last_known = media.last_checked_count
+
+                    # If stored count is larger than what's actually aired, the DB has stale data from old logic - reset without notifying
+                    if media.media_type == MediaType.ANIME and last_known > total_count:
+                        self.logger.info(
+                            f"Stale count detected for {media.title_romaji}: "
+                            f"stored={last_known}, aired={total_count}. Resetting."
+                        )
+                        updates_to_make.append((media.id, float(total_count)))
+                        continue
 
                     if total_count > last_known:
                         type_label = (

@@ -103,6 +103,9 @@ class AniListClient:
                 chapters
                 status
                 siteUrl
+                nextAiringEpisode {
+                    episode
+                }
             }
         }
         """
@@ -118,6 +121,7 @@ class AniListClient:
                 "type": media.get("type"),
                 "title_romaji": media.get("title", {}).get("romaji"),
                 "title_english": media.get("title", {}).get("english"),
+                "next_airing_episode": media.get("nextAiringEpisode"),
                 "episodes": media.get("episodes"),
                 "chapters": media.get("chapters"),
                 "status": media.get("status"),
