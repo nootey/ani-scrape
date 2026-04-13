@@ -121,12 +121,6 @@ async def start_scheduler(logger: Logger) -> None:
         job_duration = time.time() - job_start
         s_logger.info(f"Job completed in {job_duration:.1f}s")
 
-        # Warn if approaching interval limit
-        interval_seconds = config.scheduler.interval_minutes * 60
-        if job_duration > (interval_seconds * 0.8):
-            warning = f"⚠️ Scrape took {job_duration:.1f}s ({job_duration / 60:.1f}min), close to {interval_seconds}s interval."
-            s_logger.warning(warning)
-
         last_job_end_time = time.time()
 
     scheduler.add_listener(handle_job_error, EVENT_JOB_ERROR)
