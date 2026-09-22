@@ -9,6 +9,12 @@ on:
       - '*.md'
     branches:
       - main
+  workflow_call:
+    inputs:
+      version:
+        description: "Release tag to build, e.g. v1.2.3"
+        type: string
+        required: true
   workflow_dispatch:
 
 jobs:
@@ -19,6 +25,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.version || github.ref }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -39,12 +47,10 @@ jobs:
           images: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/aniscrape
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha,event=pr
+            type=semver,pattern={{version}},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
           flavor: |
-            latest=true
+            latest=${{ inputs.version != '' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -52,7 +58,8 @@ jobs:
           context: .
           file: ./deployment/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'push' }}
+          push: ${{ steps.meta.outputs.tags != '' }}
           tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
