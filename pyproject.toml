@@ -14,7 +14,7 @@ dependencies = [
     "pytz>=2025.2",
     "requests>=2.32.5",
     "ruff>=0.14.10",
-    "sqlalchemy>=2.0.45",
+    "sqlalchemy[asyncio]>=2.0.45",
 ]
 
 [dependency-groups]
