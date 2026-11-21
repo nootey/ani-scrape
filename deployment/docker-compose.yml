@@ -1,8 +1,8 @@
+name: aniscrape
+
 services:
   aniscrape:
-    build:
-      context: ..
-      dockerfile: deployment/Dockerfile
+    image: nootey/aniscrape:latest
     container_name: aniscrape
     restart: unless-stopped
     volumes:

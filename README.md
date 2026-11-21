@@ -32,8 +32,11 @@ You can run the app locally, but the easiest way is with Docker.
 Run the scrapper with this command:
 
 ```bash
-docker compose -f ./deployment/docker-compose.yml -p aniscrape up
+make docker-up
 ```
+
+This pulls the published `nootey/aniscrape` image for amd64 and arm64, so the same command also updates the app.
+To build from source instead, use `make docker-up build=1`.
 
 **Manual Mode**
 ```bash

@@ -1,0 +1,6 @@
+# Build overlay: the shared docker-compose.yml only pulls the image; add this file to build from source instead.
+services:
+  aniscrape:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
