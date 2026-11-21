@@ -1,3 +1,10 @@
+COMPOSE       := -f ./deployment/docker-compose.yml
+COMPOSE_BUILD := -f ./deployment/docker-compose.build.yml
+
+# Docker targets pull the published image by default; pass build=1 to build from source instead
+BUILD = $(if $(build),$(COMPOSE_BUILD))
+FETCH = $(if $(build),--build,--pull always)
+
 default: run
 
 run:
@@ -7,7 +14,7 @@ lint:
 	uv run ruff check . --fix
 
 docker-up:
-	docker compose -f ./deployment/docker-compose.yml -p aniscrape up -d --build
+	docker compose $(COMPOSE) $(BUILD) up -d $(FETCH)
 
 docker-down:
-	docker compose -f ./deployment/docker-compose.yml -p aniscrape down
+	docker compose $(COMPOSE) down
