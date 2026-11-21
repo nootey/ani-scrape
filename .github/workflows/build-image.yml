@@ -48,7 +48,6 @@ jobs:
             ${{ secrets.DOCKER_HUB_USERNAME }}/aniscrape
           tags: |
             type=semver,pattern={{version}},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.version }},enable=${{ inputs.version != '' }}
           flavor: |
             latest=${{ inputs.version != '' }}
 
